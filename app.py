@@ -18,7 +18,7 @@ st.set_page_config(
 
 # --- PERSISTENCE ENGINE (Browser Bridge) ---
 def sync_wishlist_to_localstorage():
-    """Pushes the current Python wishlist to the browser's LocalStorage"""
+    """Pushes current Python wishlist to Browser LocalStorage"""
     wishlist_data = json.dumps(st.session_state.wishlist)
     js_code = f"""
     <script>
@@ -29,10 +29,12 @@ def sync_wishlist_to_localstorage():
 
 # Initialize Session State
 if "view" not in st.session_state: st.session_state.view = "home"
+if "prev_view" not in st.session_state: st.session_state.prev_view = "home"
 if "selected_tmdb_id" not in st.session_state: st.session_state.selected_tmdb_id = None
 if "active_cat" not in st.session_state: st.session_state.active_cat = "popular"
 if "search_results" not in st.session_state: st.session_state.search_results = None
 if "wishlist" not in st.session_state: st.session_state.wishlist = []
+if "show_wishlist" not in st.session_state: st.session_state.show_wishlist = True
 
 # =============================
 # PREMIUM UI & TYPOGRAPHY
@@ -48,7 +50,13 @@ st.markdown("""
     }
 
     header, [data-testid="stHeader"] { display: none; }
-    [data-testid="stSidebar"] { background-color: #0f172a; border-right: 1px solid #1e293b; }
+    
+    /* Dynamic Sidebar Visibility */
+    [data-testid="stSidebar"] { 
+        background-color: #0f172a; 
+        border-right: 1px solid #1e293b;
+        transition: all 0.3s ease;
+    }
 
     h1 { font-family: 'Clash Display', sans-serif; font-size: 2.8rem !important; font-weight: 600; color: #ffffff; margin-bottom: 0px; }
     h2 { font-family: 'Clash Display', sans-serif; font-size: 1.6rem !important; color: #38bdf8; margin: 0; }
@@ -122,9 +130,13 @@ def api_get_json(path: str, params: dict | None = None):
 # =============================
 # SHARED LOGIC FUNCTIONS
 # =============================
-def navigate_to_details(tmdb_id: int):
-    st.session_state.view = "details"
-    st.session_state.selected_tmdb_id = int(tmdb_id)
+def navigate_to(view_name, tmdb_id=None):
+    """Handles logic for going back without closing app"""
+    st.session_state.prev_view = st.session_state.view
+    st.session_state.view = view_name
+    if tmdb_id:
+        st.session_state.selected_tmdb_id = int(tmdb_id)
+    st.rerun()
 
 def clean_genres(raw_genres):
     if not raw_genres: return ["General"]
@@ -137,8 +149,6 @@ def movie_card_grid(movies, key_prefix="grid"):
     for idx, m in enumerate(movies):
         with cols[idx % 5]:
             p_url = m.get("poster_url") or "https://via.placeholder.com/500x750/0b0f19/ffffff?text=No+Poster"
-            
-            # FIXED: Updated to use use_column_width to resolve the reported error
             st.image(p_url, use_column_width=True)
             
             title = m.get('title', 'Untitled')
@@ -152,8 +162,7 @@ def movie_card_grid(movies, key_prefix="grid"):
             b1, b2 = st.columns(2)
             with b1:
                 if st.button("OPEN", key=f"v_{key_prefix}_{m.get('tmdb_id')}_{idx}", use_container_width=True):
-                    navigate_to_details(m.get("tmdb_id"))
-                    st.rerun()
+                    navigate_to("details", m.get("tmdb_id"))
             with b2:
                 is_saved = any(item['tmdb_id'] == m.get('tmdb_id') for item in st.session_state.wishlist)
                 label = "REMOVE" if is_saved else "➕ SAVE"
@@ -185,7 +194,7 @@ def fetch_and_show_recs(movie_title, key_pfx):
 # TOP NAVIGATION
 # =============================
 with st.container():
-    c1, c2, c3 = st.columns([1.2, 3, 0.8], vertical_alignment="center")
+    c1, c2, c3, c4 = st.columns([1.2, 3, 0.6, 0.6], vertical_alignment="center")
     with c1:
         st.markdown("<h2>🎬 MoviesHub</h2>", unsafe_allow_html=True)
     with c2:
@@ -205,6 +214,13 @@ with st.container():
                         st.session_state.view = "home"
                         st.rerun()
     with c3:
+        # Wishlist Toggle Button
+        toggle_label = "📂 LIST" if st.session_state.show_wishlist else "📁 LIST"
+        if st.button(toggle_label, use_container_width=True):
+            st.session_state.show_wishlist = not st.session_state.show_wishlist
+            st.rerun()
+    with c4:
+        # Home button logic to ensure it doesn't "close" the app
         if st.button("🏠 HOME", use_container_width=True):
             st.session_state.view = "home"
             st.session_state.search_results = None
@@ -213,32 +229,39 @@ with st.container():
 st.divider()
 
 # =============================
-# SIDEBAR
+# SIDEBAR (Wishlist Panel)
 # =============================
-with st.sidebar:
-    st.markdown("### 📌 PERSISTENT WATCHLIST")
-    if not st.session_state.wishlist:
-        st.caption("Wishlist survives refreshes.")
-    else:
-        wish_map = {}
-        for item in st.session_state.wishlist:
-            g_names = clean_genres(item.get('genres', []))
-            primary = g_names[0] if g_names else "Misc"
-            if primary not in wish_map: wish_map[primary] = []
-            wish_map[primary].append(item)
-            
-        for genre, items in wish_map.items():
-            with st.expander(f"📁 {genre.upper()}"):
-                for i, w in enumerate(items):
-                    if st.button(w.get('title'), key=f"sw_{w.get('tmdb_id')}_{i}", use_container_width=True):
-                        navigate_to_details(w.get('tmdb_id'))
-                        st.rerun()
+if st.session_state.show_wishlist:
+    with st.sidebar:
+        st.markdown("### 📌 PERSISTENT WATCHLIST")
+        if not st.session_state.wishlist:
+            st.caption("Wishlist survives refreshes.")
+        else:
+            wish_map = {}
+            for item in st.session_state.wishlist:
+                g_names = clean_genres(item.get('genres', []))
+                primary = g_names[0] if g_names else "Misc"
+                if primary not in wish_map: wish_map[primary] = []
+                wish_map[primary].append(item)
+                
+            for genre, items in wish_map.items():
+                with st.expander(f"📁 {genre.upper()}"):
+                    for i, w in enumerate(items):
+                        if st.button(w.get('title'), key=f"sw_{w.get('tmdb_id')}_{i}", use_container_width=True):
+                            navigate_to("details", w.get('tmdb_id'))
+else:
+    # Forces Streamlit to hide the sidebar if toggle is OFF
+    st.markdown("<style>[data-testid='stSidebar'] { display: none; }</style>", unsafe_allow_html=True)
 
 # =============================
 # VIEW CONTROLLER
 # =============================
 if st.session_state.view == "home":
     if st.session_state.search_results:
+        # "Back" logic for search results
+        if st.button("← BACK TO TRENDING"):
+            st.session_state.search_results = None
+            st.rerun()
         st.markdown("### Search Results")
         movie_card_grid(st.session_state.search_results, "search_res")
         if st.session_state.search_results:
@@ -258,6 +281,10 @@ else:
     movie, _ = api_get_json(f"/movie/id/{m_id}")
     
     if movie:
+        if st.button("← BACK TO PREVIOUS"):
+            st.session_state.view = st.session_state.prev_view
+            st.rerun()
+            
         col_l, col_r = st.columns([1, 2.5])
         with col_l: st.image(movie.get("poster_url", ""), use_column_width=True)
         with col_r:
