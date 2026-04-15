@@ -1,5 +1,4 @@
-import httpx
-import asyncio
+import requests
 import streamlit as st
 import json
 from streamlit.components.v1 import html
@@ -77,7 +76,6 @@ st.markdown("""
         border-radius: 12px;
         height: 340px !important;
         object-fit: cover;
-        transition: none !important;
     }
 
     .stButton > button {
@@ -112,18 +110,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================
-# ASYNC API ENGINE
+# BACKEND API ENGINE
 # =============================
-async def fetch_data(path: str, params: dict = None):
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(f"{API_BASE}{path}", params=params, timeout=15.0)
-            return response.json(), None
-        except Exception as e:
-            return None, str(e)
-
 def api_get_json(path: str, params: dict | None = None):
-    return asyncio.run(fetch_data(path, params))
+    try:
+        response = requests.get(f"{API_BASE}{path}", params=params, timeout=15.0)
+        return response.json(), None
+    except Exception as e:
+        return None, str(e)
 
 # =============================
 # SHARED LOGIC FUNCTIONS
@@ -143,6 +137,8 @@ def movie_card_grid(movies, key_prefix="grid"):
     for idx, m in enumerate(movies):
         with cols[idx % 5]:
             p_url = m.get("poster_url") or "https://via.placeholder.com/500x750/0b0f19/ffffff?text=No+Poster"
+            
+            # FIXED: Updated to use use_column_width to resolve the reported error
             st.image(p_url, use_column_width=True)
             
             title = m.get('title', 'Untitled')
@@ -159,7 +155,6 @@ def movie_card_grid(movies, key_prefix="grid"):
                     navigate_to_details(m.get("tmdb_id"))
                     st.rerun()
             with b2:
-                # INSTANT ADD/REMOVE & PERSIST
                 is_saved = any(item['tmdb_id'] == m.get('tmdb_id') for item in st.session_state.wishlist)
                 label = "REMOVE" if is_saved else "➕ SAVE"
                 if st.button(label, key=f"w_{key_prefix}_{m.get('tmdb_id')}_{idx}", use_container_width=True):
@@ -209,7 +204,7 @@ with st.container():
                             } for x in res.get("results", []) if x.get('poster_path')]
                         st.session_state.view = "home"
                         st.rerun()
-    with c3: # FIXED SYNTAX HERE
+    with c3:
         if st.button("🏠 HOME", use_container_width=True):
             st.session_state.view = "home"
             st.session_state.search_results = None
