@@ -115,8 +115,6 @@ if "timeline_year"         not in st.session_state:
     st.session_state.timeline_year = 2020
 if "selected_language"     not in st.session_state:
     st.session_state.selected_language = "All Languages"
-if "show_side_panel"       not in st.session_state:
-    st.session_state.show_side_panel = False
 
 # =============================
 # QUERY PARAM ROUTING
@@ -133,7 +131,7 @@ if qp_id:
         pass
 
 # =============================
-# NAVIGATION HELPERS
+# NAVIGATION HELPERS (unchanged)
 # =============================
 def goto_home():
     st.session_state.view = "home"
@@ -160,7 +158,7 @@ def goto_timeline():
     st.rerun()
 
 # =============================
-# API HELPERS
+# API HELPERS (unchanged)
 # =============================
 @st.cache_data(ttl=30)
 def api_get_json(path: str, params: dict | None = None):
@@ -386,6 +384,7 @@ def timeline_movie_card(title: str, poster_url: str, year: str, color: str) -> s
       </div>
     </div>"""
 
+# ── NEW: Visual genre card HTML ──────────────────────────────
 def genre_card_html(name: str, icon: str, color: str, active: bool) -> str:
     border  = f"2px solid {color}"       if active else "1px solid rgba(255,255,255,0.1)"
     glow    = f"0 0 22px {color}55"      if active else "none"
@@ -403,6 +402,7 @@ def genre_card_html(name: str, icon: str, color: str, active: bool) -> str:
         f'</div>'
     )
 
+# ── NEW: Language filter helper ──────────────────────────────
 def filter_cards_by_language(cards: list, lang_code: str) -> list:
     """Client-side filter: keep only cards whose original_language matches."""
     if not lang_code:
@@ -538,11 +538,35 @@ h1,h2,h3 {{
   box-shadow:0 0 0 3px {p1}33 !important;
 }}
 
+/* ── Slider ── */
+.stSlider .rc-slider-rail {{ background:rgba(255,255,255,0.1) !important; }}
+.stSlider .rc-slider-track {{ background:{p1} !important; }}
+.stSlider .rc-slider-handle {{
+  background:{p1} !important;border-color:{p1} !important;
+  box-shadow:0 0 0 4px {p1}44 !important;
+}}
+
+/* ── Divider ── */
+hr {{ border-color:rgba(255,255,255,0.07) !important;margin:20px 0 !important; }}
+
 /* ── Selectbox ── */
 [data-testid="stSelectbox"] > div > div {{
   background:rgba(255,255,255,0.06) !important;
   border:1px solid rgba(255,255,255,0.14) !important;
   border-radius:12px !important;color:#fff !important;
+}}
+
+/* ── Alerts ── */
+.stAlert {{ border-radius:12px !important;border:none !important; }}
+
+/* ── Images ── */
+.stImage img {{
+  border-radius:12px !important;
+  transition:transform 0.25s ease,box-shadow 0.25s ease !important;
+}}
+.stImage img:hover {{
+  transform:scale(1.03) !important;
+  box-shadow:0 16px 40px rgba(0,0,0,0.5) !important;
 }}
 
 /* ── Horizontal scroll ── */
@@ -559,6 +583,74 @@ h1,h2,h3 {{
   font-family:'DM Sans',sans-serif;
   font-size:0.72rem;font-weight:600;letter-spacing:0.12em;
   text-transform:uppercase;color:{p1};margin-bottom:4px;
+}}
+
+/* ── Animations ── */
+@keyframes fadeUp {{
+  from {{ opacity:0;transform:translateY(16px); }}
+  to   {{ opacity:1;transform:translateY(0); }}
+}}
+.fade-up {{ animation:fadeUp 0.5s ease forwards; }}
+
+/* ── Timeline ── */
+.timeline-dot {{
+  width:14px;height:14px;border-radius:50%;
+  background:{p1};box-shadow:0 0 12px {p1}88;
+  flex-shrink:0;margin-top:5px;
+}}
+
+/* ── Rating ring ── */
+.rating-rings {{
+  display:flex;gap:24px;justify-content:center;
+  flex-wrap:wrap;margin:16px 0;
+}}
+
+/* ── Watchlist item ── */
+.wl-item {{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;border-radius:12px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.08);
+  margin-bottom:8px;transition:background 0.2s;
+}}
+.wl-item:hover {{ background:rgba(255,255,255,0.09); }}
+
+/* ── Muted text ── */
+.small-muted {{ color:rgba(255,255,255,0.4);font-size:0.85rem; }}
+
+/* ── Genre cards grid ── */
+.genre-grid {{
+  display:grid;
+  grid-template-columns:repeat(7, 1fr);
+  gap:12px;margin:12px 0 24px;
+}}
+@media (max-width: 900px) {{
+  .genre-grid {{ grid-template-columns:repeat(4, 1fr); }}
+}}
+@media (max-width: 560px) {{
+  .genre-grid {{ grid-template-columns:repeat(3, 1fr); }}
+}}
+
+/* ── Cast name emphasis ── */
+.cast-name {{
+  color:#fff !important;
+  font-size:0.88rem !important;
+  font-weight:700 !important;
+  letter-spacing:0.01em;
+}}
+.cast-role {{
+  color:rgba(255,255,255,0.5) !important;
+  font-size:0.74rem !important;
+  font-style:italic;
+}}
+
+/* ── Rating badge ── */
+.rating-badge {{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(255,215,0,0.15);
+  border:1px solid rgba(255,215,0,0.3);
+  border-radius:8px;padding:4px 10px;
+  font-size:0.85rem;font-weight:700;color:#fbbf24;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -649,39 +741,17 @@ with st.sidebar:
 # =============================
 # MAIN HEADER
 # =============================
-col_h1, col_h2 = st.columns([5, 1])
-with col_h1:
-    st.markdown(
-        "<h1 style='font-family:Crimson Pro,Georgia,serif;font-size:2.8rem;"
-        "font-weight:700;color:#fff;margin:0 0 4px;letter-spacing:-0.03em;'>"
-        "🎬 CineVerse</h1>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        "<div class='small-muted' style='margin-bottom:8px;'>Discover • Curate • Experience</div>",
-        unsafe_allow_html=True,
-    )
-with col_h2:
-    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-    if st.button("📂 Toggle Panel", use_container_width=True):
-        st.session_state.show_side_panel = not st.session_state.show_side_panel
-        st.rerun()
-
+st.markdown(
+    "<h1 style='font-family:Crimson Pro,Georgia,serif;font-size:2.8rem;"
+    "font-weight:700;color:#fff;margin:0 0 4px;letter-spacing:-0.03em;'>"
+    "🎬 CineVerse</h1>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    "<div class='small-muted' style='margin-bottom:8px;'>Discover • Curate • Experience</div>",
+    unsafe_allow_html=True,
+)
 st.divider()
-
-# ── Custom Toggleable Side Panel ──
-if st.session_state.show_side_panel:
-    with st.expander("📌 Quick View Panel", expanded=True):
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.8);'>"
-            "This is your custom side panel. You can easily place additional filters, stats, or tools here without disrupting the core app UI."
-            "</div>", unsafe_allow_html=True
-        )
-        if st.session_state.watchlist:
-            st.write(f"**Watchlist Items:** {len(st.session_state.watchlist)}")
-        else:
-            st.write("Your Watchlist is empty.")
-    st.divider()
 
 # ══════════════════════════════════════════════════════════
 # VIEW: HOME
@@ -706,36 +776,42 @@ if st.session_state.view == "home":
                 unsafe_allow_html=True,
             )
 
-    # ── GENRE SELECTION (Dropdown) ────────────────────
+    # ── GENRE CARDS (Responsive Grid) ────────────────────
     st.markdown("<div class='section-label'>Browse by Genre</div>", unsafe_allow_html=True)
 
-    genre_names = ["All"] + [g["name"] for g in GENRE_CARDS]
-    def get_genre_label(gname):
-        if gname == "All": return "🌍 All Genres"
-        gicon = next((g["icon"] for g in GENRE_CARDS if g["name"] == gname), "🎬")
-        return f"{gicon} {gname}"
+    # Build responsive genre grid using Streamlit columns (7 + 7 = 14 genres)
+    row1 = GENRE_CARDS[:7]
+    row2 = GENRE_CARDS[7:]
 
-    current_sel = st.session_state.selected_genre_filter
-    current_idx = genre_names.index(current_sel) if current_sel in genre_names else 0
+    for row_genres in [row1, row2]:
+        gcols = st.columns(len(row_genres))
+        for i, gdata in enumerate(row_genres):
+            gname  = gdata["name"]
+            gicon  = gdata["icon"]
+            gpal   = GENRE_PALETTES.get(gname, GENRE_PALETTES["default"])
+            active = st.session_state.selected_genre_filter == gname
+            with gcols[i]:
+                st.markdown(genre_card_html(gname, gicon, gpal["primary"], active),
+                            unsafe_allow_html=True)
+                # "All" reset or genre select button
+                btn_label = f"✓ {gname}" if active else gname
+                if st.button(btn_label, key=f"genre_card_{gname}", use_container_width=True):
+                    if active:
+                        st.session_state.selected_genre_filter = "All"
+                    else:
+                        st.session_state.selected_genre_filter = gname
+                        # Update palette to match genre
+                        st.session_state.theme_palette = gpal
+                        inject_css(gpal)
+                    st.rerun()
 
-    selected_genre = st.selectbox(
-        "Select a Genre",
-        options=genre_names,
-        index=current_idx,
-        format_func=get_genre_label,
-        label_visibility="collapsed"
-    )
-
-    if selected_genre != current_sel:
-        st.session_state.selected_genre_filter = selected_genre
-        if selected_genre != "All":
-            gpal = GENRE_PALETTES.get(selected_genre, GENRE_PALETTES["default"])
-            st.session_state.theme_palette = gpal
-            inject_css(gpal)
-        else:
-            st.session_state.theme_palette = GENRE_PALETTES["default"]
-            inject_css(GENRE_PALETTES["default"])
-        st.rerun()
+    # "All" / reset button
+    if st.session_state.selected_genre_filter != "All":
+        reset_col, _ = st.columns([1, 5])
+        with reset_col:
+            if st.button("✕ Clear Genre Filter", use_container_width=True):
+                st.session_state.selected_genre_filter = "All"
+                st.rerun()
 
     st.divider()
 
